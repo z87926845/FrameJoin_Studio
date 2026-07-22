@@ -22,14 +22,28 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: ${{ github.event.workflow_run.id }}
-          path: release
-          merge-multiple: true
+          path: downloaded-artifacts
 
-      - name: Validate installer files
+      - name: Flatten and validate installer files
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf release
+          mkdir -p release
+
+          while IFS= read -r -d '' source_file; do
+            file_name="$(basename "$source_file")"
+            destination="release/$file_name"
+            if [[ -e "$destination" ]]; then
+              echo "Duplicate release asset name: $file_name" >&2
+              exit 1
+            fi
+            cp "$source_file" "$destination"
+          done < <(find downloaded-artifacts -type f -print0)
+
+          echo "Flattened release assets:"
           ls -lah release
+
           expected=(
             "FrameJoin_Studio_v${APP_VERSION}_Windows_x64_Portable.zip"
             "FrameJoin_Studio_v${APP_VERSION}_Windows_x64_Portable.zip.sha256.txt"
@@ -44,9 +58,20 @@ jobs:
             "FrameJoin_Studio_v${APP_VERSION}_macOS_Intel.pkg"
             "FrameJoin_Studio_v${APP_VERSION}_macOS_Intel.pkg.sha256.txt"
           )
+
           for file in "${expected[@]}"; do
-            test -f "release/$file" || { echo "Missing release asset: $file" >&2; exit 1; }
+            test -f "release/$file" || {
+              echo "Missing release asset: $file" >&2
+              find downloaded-artifacts -type f -print >&2
+              exit 1
+            }
           done
+
+          actual_count="$(find release -maxdepth 1 -type f | wc -l | tr -d ' ')"
+          if [[ "$actual_count" != "12" ]]; then
+            echo "Expected 12 release assets, found $actual_count" >&2
+            exit 1
+          fi
 
       - name: Create or update v0.21 release
         env:
@@ -57,6 +82,7 @@ jobs:
           set -euo pipefail
           tag="v${APP_VERSION}"
           title="FrameJoin Studio ${APP_VERSION}"
+
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release/* --clobber
             gh release edit "$tag" --title "$title" --target "$TARGET_SHA"
