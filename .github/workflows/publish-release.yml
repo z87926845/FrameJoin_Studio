@@ -76,6 +76,7 @@ jobs:
       - name: Create or update v0.21 release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
         shell: bash
         run: |
@@ -83,12 +84,13 @@ jobs:
           tag="v${APP_VERSION}"
           title="FrameJoin Studio ${APP_VERSION}"
 
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" release/* --clobber
-            gh release edit "$tag" --title "$title" --target "$TARGET_SHA"
+          if gh release view "$tag" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release upload "$tag" release/* --clobber --repo "$GH_REPO"
+            gh release edit "$tag" --title "$title" --target "$TARGET_SHA" --repo "$GH_REPO"
           else
             gh release create "$tag" release/* \
               --target "$TARGET_SHA" \
               --title "$title" \
-              --generate-notes
+              --generate-notes \
+              --repo "$GH_REPO"
           fi
