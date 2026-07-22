@@ -1,6 +1,6 @@
 # FrameJoin Studio 0.19 · 极速拼接与序列帧转视频
 
-这是 Windows x64 便携版，不需要安装。双击 `FrameJoinStudio.exe` 启动。
+这是 Windows x64 视频原码拼接与序列帧转视频工具。
 
 ## 核心功能
 
@@ -40,13 +40,36 @@
 - **目标码流模式**：H.264/H.265 使用填写的目标码流及峰值限制进行压缩，属于有损输出；更适合控制文件大小和普通播放。
 - MP4 不支持 FFV1，因此 FFV1 请使用 MOV 或 MKV。
 
+## 获取完整源码
+
+仓库中的 `source_parts/` 保存经过 SHA-256 校验的 0.19 完整源码包分卷。克隆仓库后，在 Windows 上双击：
+
+```text
+extract_source.bat
+```
+
+也可以在命令行执行：
+
+```bash
+python extract_source.py
+```
+
+脚本会依次完成：
+
+1. 合并源码分卷。
+2. 校验完整源码包 SHA-256：`907c9771b5ce0582dc8d83e35ca3cdb9dd176552ef343842a1f7392118f178b7`。
+3. 将完整的 `framejoin/`、`main.py`、依赖清单和授权说明展开到仓库根目录。
+
+仓库同时保留了 `.github/workflows/publish-source.yml`，也可在 GitHub Actions 页面手动运行 **Expand source archive**。
+
 ## 源码运行
 
 1. 安装 Python 3.12。
-2. 执行 `pip install -r requirements.txt`。
-3. 将 `ffmpeg.exe`、`ffprobe.exe` 和可选的 `ffplay.exe` 放入 `tools/` 目录，或加入系统 `PATH`。
-4. 执行 `python main.py`。
+2. 首次克隆先运行 `extract_source.bat` 或 `python extract_source.py`。
+3. 执行 `pip install -r requirements.txt`。
+4. 将 `ffmpeg.exe`、`ffprobe.exe` 和可选的 `ffplay.exe` 放入 `tools/` 目录，或加入系统 `PATH`。
+5. 执行 `python main.py`。
 
 ## 便携版说明
 
-完整 Windows 便携包包含 FFmpeg、Qt 和 Python 运行库，体积超过 GitHub 普通单文件 100 MB 限制，因此仓库仅保存源码与构建说明。便携包可通过项目发布页或单独提供的下载文件获取。
+完整 Windows 便携包包含 FFmpeg、Qt 和 Python 运行库，约 188 MB，超过 GitHub 普通单文件 100 MB 限制，因此仓库保存源码、校验值与构建说明，便携包单独提供下载。
