@@ -3,6 +3,7 @@
 #define MySourceDir GetEnv("APP_SOURCE_DIR")
 #define MyOutputDir GetEnv("APP_OUTPUT_DIR")
 #define MyIconFile GetEnv("APP_ICON_FILE")
+#define MyChineseLanguageFile GetEnv("APP_CHINESE_LANGUAGE_FILE")
 #define MyAppExeName "FrameJoinStudio.exe"
 
 [Setup]
@@ -32,7 +33,7 @@ ChangesAssociations=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinesesimp"; MessagesFile: "{#MyChineseLanguageFile}"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
