@@ -17,38 +17,49 @@ jobs:
       APP_VERSION: "0.21"
     steps:
       - name: Download artifacts from successful installer build
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
-          REPOSITORY: ${{ github.repository }}
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          path: release
+          merge-multiple: true
+
+      - name: Validate installer files
+        shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifact-zips release
-          gh api "repos/${REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
-            --jq '.artifacts[] | select(.expired == false) | [.id, .name] | @tsv' > artifacts.tsv
-          test -s artifacts.tsv
-          while IFS=$'\t' read -r artifact_id artifact_name; do
-            zip_path="artifact-zips/${artifact_name}.zip"
-            unpack_dir="artifact-zips/${artifact_name}"
-            gh api "repos/${REPOSITORY}/actions/artifacts/${artifact_id}/zip" > "$zip_path"
-            mkdir -p "$unpack_dir"
-            unzip -q "$zip_path" -d "$unpack_dir"
-            find "$unpack_dir" -type f -exec cp {} release/ \;
-          done
-          test -n "$(find release -maxdepth 1 -type f -print -quit)"
           ls -lah release
+          expected=(
+            "FrameJoin_Studio_v${APP_VERSION}_Windows_x64_Portable.zip"
+            "FrameJoin_Studio_v${APP_VERSION}_Windows_x64_Portable.zip.sha256.txt"
+            "FrameJoin_Studio_v${APP_VERSION}_Windows_x64_Setup.exe"
+            "FrameJoin_Studio_v${APP_VERSION}_Windows_x64_Setup.exe.sha256.txt"
+            "FrameJoin_Studio_v${APP_VERSION}_macOS_arm64.dmg"
+            "FrameJoin_Studio_v${APP_VERSION}_macOS_arm64.dmg.sha256.txt"
+            "FrameJoin_Studio_v${APP_VERSION}_macOS_arm64.pkg"
+            "FrameJoin_Studio_v${APP_VERSION}_macOS_arm64.pkg.sha256.txt"
+            "FrameJoin_Studio_v${APP_VERSION}_macOS_Intel.dmg"
+            "FrameJoin_Studio_v${APP_VERSION}_macOS_Intel.dmg.sha256.txt"
+            "FrameJoin_Studio_v${APP_VERSION}_macOS_Intel.pkg"
+            "FrameJoin_Studio_v${APP_VERSION}_macOS_Intel.pkg.sha256.txt"
+          )
+          for file in "${expected[@]}"; do
+            test -f "release/$file" || { echo "Missing release asset: $file" >&2; exit 1; }
+          done
 
       - name: Create or update v0.21 release
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
         run: |
           set -euo pipefail
           tag="v${APP_VERSION}"
           title="FrameJoin Studio ${APP_VERSION}"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release/* --clobber
-            gh release edit "$tag" --title "$title"
+            gh release edit "$tag" --title "$title" --target "$TARGET_SHA"
           else
             gh release create "$tag" release/* \
               --target "$TARGET_SHA" \
