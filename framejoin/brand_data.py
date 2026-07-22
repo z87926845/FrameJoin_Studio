@@ -9,8 +9,8 @@ class BrandingIntegrityError(RuntimeError):
 
 
 ASSET_HASHES = {
-    "splash_screen.svg": "0fe8d6c3eb2c02117f0c0ab73efdb3f20824cf8315d961b4e25e565dee7f652a",
-    "logo.svg": "49960d1b37390b08cac19f1bccf4e0d04c4ad3bdd99622f903776fe76c87b08d",
+    "splash_screen.svg": "4f3a6ec9424c991a82307ef21ae6815d3ac8b17606a584f1b1d586d9d163212c",
+    "logo.svg": "6a4cea791502a953b01e50aec34e9ec098f027d581514ca8b591186b5b639f12",
 }
 
 
@@ -24,7 +24,9 @@ def asset_bytes(name: str) -> bytes:
         raise BrandingIntegrityError(f"Fixed branding asset is missing: {name}") from exc
     actual = hashlib.sha256(data).hexdigest()
     if actual != expected:
-        raise BrandingIntegrityError(f"Branding integrity check failed: {name}\nExpected: {expected}\nActual: {actual}")
+        raise BrandingIntegrityError(
+            f"Branding integrity check failed: {name}\nExpected: {expected}\nActual: {actual}"
+        )
     return data
 
 
