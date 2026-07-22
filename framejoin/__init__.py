@@ -1,3 +1,3 @@
-"""FrameJoin Studio lossless-join core package."""
+"""FrameJoin Studio package."""
 
-__version__ = "0.19"
+__version__ = "0.21"

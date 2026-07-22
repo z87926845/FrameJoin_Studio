@@ -65,6 +65,7 @@ class MediaClip:
     start_frame: int = 0
     end_frame: int = 0
 
+    # Image-sequence metadata. sequence_end_number is inclusive.
     sequence_pattern: str = ""
     sequence_start_number: int = 0
     sequence_end_number: int = 0
@@ -76,6 +77,7 @@ class MediaClip:
     sequence_actual_files: int = 0
     has_alpha: bool = False
 
+    # Per-clip colour treatment.
     lut_path: str = ""
     lut_interp: str = "tetrahedral"
     lut_strength: float = 1.0
@@ -208,11 +210,12 @@ class MediaClip:
 
 @dataclass(slots=True)
 class JoinSettings:
-    container: str = "auto"
+    container: str = "auto"  # video: auto/copy container; sequence: mp4/mov/mkv
     faststart: bool = True
-    sequence_codec: str = "h264_lossless"
+    sequence_codec: str = "h264_lossless"  # h264_lossless | h265_lossless | ffv1
     sequence_bitrate_enabled: bool = False
     sequence_bitrate_mbps: int = 100
+    sequence_encoder_backend: str = "auto"  # auto | cpu | nvenc | qsv | amf | videotoolbox
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

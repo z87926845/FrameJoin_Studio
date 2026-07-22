@@ -1,75 +1,82 @@
-# FrameJoin Studio 0.19 · 极速拼接与序列帧转视频
+# FrameJoin Studio 0.21
 
-这是 Windows x64 视频原码拼接与序列帧转视频工具。
+[中文](#中文) · [English](#english)
 
-## 核心功能
+## 中文
 
-- **视频极速无损拼接**：参数兼容的视频使用 FFmpeg `-c copy` 原码流复制，不重新编码。
-- **序列帧转视频**：支持 PNG、JPG、TIFF、TGA、BMP、DPX、EXR、WebP、JXL 等编号序列。
-- **输入帧率设置**：载入时可设置，也可在右侧统一应用到全部序列。
-- **两种序列输出模式**：
-  - 取消勾选“按目标码流输出”：按所选 H.264、H.265 或 FFV1 进行真无损输出。
-  - 勾选“按目标码流输出”：填写 1–1000 Mbps，H.264/H.265 按目标码流压缩输出。
-- **容器支持**：MP4、MOV、MKV；FFV1 使用 MOV 或 MKV。
-- **静默预览加载**：FFmpeg/ffprobe 后台进程不弹黑色控制台窗口。
-- **逐帧检查**：预览区提供“上一帧”“下一帧”按钮，并支持左右方向键。
+FrameJoin Studio 是一款 Windows/macOS 视频原码拼接与序列帧转视频工具。
 
-## 使用方法
+### 功能
 
-### 视频极速拼接
+- 视频参数兼容时使用 FFmpeg `-c copy` 极速无损拼接，不重新编码。
+- 序列帧支持自定义帧率，并可将多组序列按列表顺序转为视频。
+- 支持 H.264 RGB 真无损、H.265 RGB 真无损、FFV1 数学无损。
+- 支持 H.264/H.265 1–1000 Mbps 目标码流输出。
+- 目标码流模式支持 NVIDIA NVENC、Intel Quick Sync、AMD AMF、Apple VideoToolbox；硬件失败自动回退 CPU。
+- MP4、MOV、MKV 输出；视频原码拼接还可跟随兼容源容器。
+- 预览不弹后台黑框，支持播放、上一帧、下一帧和拖动定位。
+- 中文/English 界面，可保存和打开 `.fjproj` 工程。
+- 固定内置 `splash_screen.svg` 与 `logo.svg`，运行时进行 SHA-256 校验，软件内没有替换入口。
 
-1. 拖入两段或更多参数一致的视频。
-2. 调整列表顺序。
-3. 选择输出容器。
-4. 点击“开始无损拼接”。
+### 安装包
 
-### 序列帧转视频
+推送到 `main` 会自动运行 **Build Installers**，生成：
 
-1. 点击“添加序列帧”，选择序列中的任意一帧。
-2. 设置输入帧率，例如 `24`、`25`、`30000/1001`、`60`。
-3. 多组序列会按列表顺序连接；所有序列需要相同分辨率、帧率、像素格式和透明通道状态。
-4. 选择 H.264、H.265 或 FFV1，以及 MP4、MOV 或 MKV。
-5. 直接无损输出时不勾选“按目标码流输出”；需要控制文件大小时勾选并填写目标码流。
-6. 点击“开始序列帧转视频”。
+- Windows x64 便携 ZIP。
+- Windows x64 双语 EXE 安装程序。
+- macOS Apple Silicon DMG/PKG。
+- macOS Intel DMG/PKG。
 
-## 输出模式说明
+在仓库 **Actions** 页面下载最新构建产物。推送 `v*` 标签时会自动创建 GitHub Release。
 
-- **H.264 直接无损**：`libx264rgb -crf 0`，保持 8-bit RGB 像素，但部分硬件播放器不能硬解。
-- **H.265 直接无损**：`libx265 lossless` 与 RGB 4:4:4，压缩率通常优于无损 H.264。
-- **FFV1 数学无损**：适合高位深、透明通道、归档和后期。
-- **目标码流模式**：H.264/H.265 使用填写的目标码流及峰值限制进行压缩，属于有损输出；更适合控制文件大小和普通播放。
-- MP4 不支持 FFV1，因此 FFV1 请使用 MOV 或 MKV。
+> macOS 当前采用临时签名，未配置 Apple Developer ID 公证。首次打开可能需要在“系统设置 → 隐私与安全性”中确认。
 
-## 获取完整源码
+### 使用
 
-仓库中的 `source_parts/` 保存经过 SHA-256 校验的 0.19 完整源码包分卷。克隆仓库后，在 Windows 上双击：
+1. 添加视频或序列帧；两类素材不能在同一任务中混合。
+2. 序列帧载入时设置帧率，例如 `24`、`24000/1001`、`30000/1001`、`60`。
+3. 不勾选目标码流时执行真无损输出；勾选后填写 1–1000 Mbps 并选择可用硬件编码器。
+4. 选择输出文件并开始输出。
 
-```text
-extract_source.bat
-```
+视频 `-c copy` 本身不重新编码，因此不会使用显卡。显卡只用于有损目标码流模式。
 
-也可以在命令行执行：
+## English
+
+FrameJoin Studio is a Windows/macOS stream-copy video joiner and image-sequence-to-video tool.
+
+### Features
+
+- Losslessly joins compatible video streams with FFmpeg `-c copy` and no re-encoding.
+- Imports numbered image sequences with a custom FPS and joins multiple sequences in list order.
+- H.264 RGB true lossless, H.265 RGB true lossless, and FFV1 mathematically lossless output.
+- H.264/H.265 target-bitrate export from 1 to 1000 Mbps.
+- NVIDIA NVENC, Intel Quick Sync, AMD AMF, and Apple VideoToolbox in target-bitrate mode, with automatic CPU fallback.
+- MP4, MOV, and MKV output.
+- Silent preview with play, previous-frame, next-frame, and scrub controls.
+- Chinese/English UI and `.fjproj` project files.
+- Fixed `splash_screen.svg` and `logo.svg` resources with runtime SHA-256 verification and no in-app replacement option.
+
+### Installers
+
+Every push to `main` runs **Build Installers** and produces:
+
+- Windows x64 portable ZIP.
+- Windows x64 bilingual EXE installer.
+- macOS Apple Silicon DMG/PKG.
+- macOS Intel DMG/PKG.
+
+Download artifacts from the latest workflow run on the **Actions** page. Pushing a `v*` tag publishes the installers to a GitHub Release.
+
+> macOS builds are currently ad-hoc signed and not notarized with an Apple Developer ID. First launch may require approval in System Settings → Privacy & Security.
+
+### Run from source
 
 ```bash
-python extract_source.py
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS: source .venv/bin/activate
+python -m pip install -r requirements.txt
+python main.py
 ```
 
-脚本会依次完成：
-
-1. 合并源码分卷。
-2. 校验完整源码包 SHA-256：`907c9771b5ce0582dc8d83e35ca3cdb9dd176552ef343842a1f7392118f178b7`。
-3. 将完整的 `framejoin/`、`main.py`、依赖清单和授权说明展开到仓库根目录。
-
-仓库同时保留了 `.github/workflows/publish-source.yml`，也可在 GitHub Actions 页面手动运行 **Expand source archive**。
-
-## 源码运行
-
-1. 安装 Python 3.12。
-2. 首次克隆先运行 `extract_source.bat` 或 `python extract_source.py`。
-3. 执行 `pip install -r requirements.txt`。
-4. 将 `ffmpeg.exe`、`ffprobe.exe` 和可选的 `ffplay.exe` 放入 `tools/` 目录，或加入系统 `PATH`。
-5. 执行 `python main.py`。
-
-## 便携版说明
-
-完整 Windows 便携包包含 FFmpeg、Qt 和 Python 运行库，约 188 MB，超过 GitHub 普通单文件 100 MB 限制，因此仓库保存源码、校验值与构建说明，便携包单独提供下载。
+Place `ffmpeg` and `ffprobe` in `tools/` or on the system `PATH`. See [BUILD.md](BUILD.md) and [TESTING.md](TESTING.md).

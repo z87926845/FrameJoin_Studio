@@ -1,14 +1,25 @@
-FrameJoin Studio 0.19 - Third-party notices
+FrameJoin Studio 0.21 - Third-party notices / 第三方组件说明
 
 PySide6 / Qt for Python
 Copyright (C) The Qt Company Ltd. and contributors.
 PySide6 is distributed under LGPLv3/GPLv3/commercial licensing terms.
 Project: https://pypi.org/project/PySide6/
 
-Python 3.12 embedded runtime
+Python 3.12 runtime
 Python is distributed under the Python Software Foundation License.
 Project: https://www.python.org/
 
-FFmpeg Windows binaries
-FFmpeg is distributed under LGPL/GPL terms depending on build configuration.
+FFmpeg and ffprobe
+FFmpeg is distributed under LGPL/GPL terms depending on the selected build configuration.
+The Windows workflow uses BtbN FFmpeg builds. The macOS workflow packages the native Homebrew FFmpeg build and its dependent libraries.
 Project: https://ffmpeg.org/
+Build source: https://github.com/BtbN/FFmpeg-Builds
+Package source: https://formulae.brew.sh/formula/ffmpeg
+
+PyInstaller
+PyInstaller is distributed under the GPL license with a special exception for distributing bundled applications.
+Project: https://pyinstaller.org/
+
+Inno Setup
+The Windows EXE installer is generated with Inno Setup.
+Project: https://jrsoftware.org/isinfo.php
