@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.log
+*.tmp
+*.fjproj
+.venv/
+venv/
+dist/
+build/
+tools/ffmpeg.exe
+tools/ffprobe.exe
+tools/ffplay.exe
+Lib/
+python3minimal/
+*.dll
+*.pyd
+*.exe

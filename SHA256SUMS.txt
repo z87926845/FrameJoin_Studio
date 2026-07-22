@@ -1,0 +1,2 @@
+da5fd20686c1bfd922639f896dcb28f19860f5cbc1061a411c886d5562e94265  FrameJoin_Studio_v0.19_Bitrate_Portable.zip
+907c9771b5ce0582dc8d83e35ca3cdb9dd176552ef343842a1f7392118f178b7  FrameJoin_Studio_v0.19_Source.zip
