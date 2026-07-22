@@ -2,6 +2,7 @@
 #define MyAppVersion GetEnv("APP_VERSION")
 #define MySourceDir GetEnv("APP_SOURCE_DIR")
 #define MyOutputDir GetEnv("APP_OUTPUT_DIR")
+#define MyIconFile GetEnv("APP_ICON_FILE")
 #define MyAppExeName "FrameJoinStudio.exe"
 
 [Setup]
@@ -20,7 +21,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#MyOutputDir}
 OutputBaseFilename=FrameJoin_Studio_v{#MyAppVersion}_Windows_x64_Setup
-SetupIconFile=..\..\framejoin\assets\app.ico
+SetupIconFile={#MyIconFile}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2/ultra64
 SolidCompression=yes
