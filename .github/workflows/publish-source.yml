@@ -1,3 +1,4 @@
+# This workflow expands the verified source archive into browsable repository files.
 name: Expand source archive
 
 on:
