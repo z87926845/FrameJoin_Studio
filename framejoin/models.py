@@ -210,12 +210,27 @@ class MediaClip:
 
 @dataclass(slots=True)
 class JoinSettings:
-    container: str = "auto"  # video: auto/copy container; sequence: mp4/mov/mkv
+    container: str = "auto"  # video: auto/copy container; encoded output: mp4/mov/mkv
     faststart: bool = True
+
+    # Image-sequence output.
+    sequence_output_mode: str = "video"  # video | frames
     sequence_codec: str = "h264_lossless"  # h264_lossless | h265_lossless | ffv1
     sequence_bitrate_enabled: bool = False
     sequence_bitrate_mbps: int = 100
     sequence_encoder_backend: str = "auto"  # auto | cpu | nvenc | qsv | amf | videotoolbox
+    sequence_frame_prefix: str = "frame_"
+    sequence_frame_start: int = 1
+    sequence_frame_digits: int = 6
+
+    # Video output. Stream copy remains the default.
+    video_transcode_enabled: bool = False
+    video_codec: str = "h264"  # h264 | h265
+    video_bitrate_mbps: int = 100
+    video_encoder_backend: str = "auto"
+    video_fps_mode: str = "source"  # source | custom
+    video_fps: str = "24"
+    video_audio_mode: str = "aac"  # aac | copy | none
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
