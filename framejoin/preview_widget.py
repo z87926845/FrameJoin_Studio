@@ -26,20 +26,13 @@ try:
     from PySide6.QtMultimediaWidgets import QVideoWidget
 
     QT_MULTIMEDIA_AVAILABLE = True
-except ImportError:  # pragma: no cover - depends on the packaged Qt build
+except ImportError:  # pragma: no cover
     QAudioOutput = QMediaPlayer = QVideoWidget = None
     QT_MULTIMEDIA_AVAILABLE = False
 
 
 class PreviewWidget(QWidget):
-    """Ordered multi-clip preview that preserves each clip's real timing.
-
-    Video clips use Qt Multimedia, which lets the operating-system backend use
-    hardware decoding when available and fall back to software decoding when it
-    is not. Image sequences use an elapsed-time clock, scaled-image cache and
-    frame skipping so the timeline keeps real-time speed even when every frame
-    cannot be painted.
-    """
+    """Ordered multi-clip preview with race-safe video source transitions."""
 
     message = Signal(str)
 
@@ -53,11 +46,19 @@ class PreviewWidget(QWidget):
         self.position_ms = 0
         self.playing = False
         self._active_timeline_index = -1
-        self._pending_video_seek = 0
-        self._play_after_load = False
         self._dragging_slider = False
         self._sequence_frame_key: tuple[str, int] | None = None
         self._frame_cache: OrderedDict[tuple[str, int, int], QPixmap] = OrderedDict()
+
+        # QMediaPlayer loads sources asynchronously. These fields make every
+        # source transition a one-shot transaction and reject stale signals
+        # from the clip that just ended.
+        self._expected_video_source = QUrl()
+        self._video_switching = False
+        self._pending_video_seek: int | None = None
+        self._pending_video_play = False
+        self._end_handled_index = -1
+        self._last_video_position = 0
 
         self.clock = QElapsedTimer()
         self.play_base_ms = 0
@@ -89,8 +90,7 @@ class PreviewWidget(QWidget):
         self.canvas.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.canvas.setMinimumSize(480, 270)
         self.canvas.setStyleSheet(
-            "background:#020813;border:1px solid #18456f;border-radius:10px;"
-            "color:#7894ad;"
+            "background:#020813;border:1px solid #18456f;border-radius:10px;color:#7894ad;"
         )
         self.canvas.setScaledContents(False)
         self.display_stack.addWidget(self.canvas)
@@ -156,6 +156,18 @@ class PreviewWidget(QWidget):
         if not self.clips:
             self.canvas.setText(tr(language, "drop"))
 
+    @staticmethod
+    def _clip_signature(clip: MediaClip) -> tuple:
+        return (
+            clip.clip_id,
+            clip.path,
+            clip.media_type,
+            clip.total_frames,
+            clip.fps_num,
+            clip.fps_den,
+            round(float(clip.duration or 0.0), 6),
+        )
+
     def set_clips(
         self,
         clips: list[MediaClip],
@@ -163,9 +175,9 @@ class PreviewWidget(QWidget):
         *,
         jump_to_selection: bool = False,
     ) -> None:
-        old_ids = [clip.clip_id for clip in self.clips]
-        new_ids = [clip.clip_id for clip in clips]
-        changed = old_ids != new_ids
+        old_signature = [self._clip_signature(clip) for clip in self.clips]
+        new_signature = [self._clip_signature(clip) for clip in clips]
+        changed = old_signature != new_signature
         self.clips = list(clips)
         self.selected_index = max(0, min(int(selected_index), max(0, len(self.clips) - 1)))
         if changed:
@@ -179,7 +191,6 @@ class PreviewWidget(QWidget):
         self._update_decoder_status()
 
     def set_clip(self, clip: MediaClip | None) -> None:
-        """Compatibility wrapper for older callers."""
         self.set_clips([clip] if clip else [], 0)
 
     def set_selected_index(self, index: int, *, jump: bool = True) -> None:
@@ -271,14 +282,18 @@ class PreviewWidget(QWidget):
         timeline_index, clip, _source_index, _start, local_ms = located
         self.position_ms = max(0, min(int(position_ms), self.slider.maximum()))
         self._set_slider_value(self.position_ms)
-        self._active_timeline_index = timeline_index
+        self._end_handled_index = -1
         if clip.media_type == "video" and self.player and self.video_widget:
             self.display_stack.setCurrentWidget(self.video_widget)
-            self._load_video(timeline_index, clip, local_ms)
+            self._activate_video(timeline_index, clip, local_ms)
         else:
+            self._active_timeline_index = timeline_index
             self.display_stack.setCurrentWidget(self.canvas)
             if clip.media_type == "sequence":
-                frame = min(max(0, clip.total_frames - 1), int((local_ms / 1000.0) * max(0.001, clip.fps)))
+                frame = min(
+                    max(0, clip.total_frames - 1),
+                    int((local_ms / 1000.0) * max(0.001, clip.fps)),
+                )
                 self._render_sequence_frame(clip, frame)
             else:
                 frame = int((local_ms / 1000.0) * max(0.001, clip.fps))
@@ -303,9 +318,10 @@ class PreviewWidget(QWidget):
             self.seek_ms(0)
         self.playing = True
         self.play_button.setText(tr(self.language, "pause"))
-        if self._current_clip_type() == "video" and self.player:
-            self._play_after_load = True
-            self.player.play()
+        located = self._locate(self.position_ms)
+        if located and located[1].media_type == "video" and self.player:
+            index, clip, _source_index, _start, local_ms = located
+            self._activate_video(index, clip, local_ms)
             self.timer.start(30)
         else:
             self.play_base_ms = self.position_ms
@@ -314,7 +330,7 @@ class PreviewWidget(QWidget):
 
     def stop(self) -> None:
         self.playing = False
-        self._play_after_load = False
+        self._pending_video_play = False
         self.timer.stop()
         if self.player:
             self.player.pause()
@@ -333,15 +349,14 @@ class PreviewWidget(QWidget):
         if not self.playing or not self.timeline:
             return
         if self._current_clip_type() == "video" and self.player:
-            # QMediaPlayer supplies timestamp-accurate video positions. This timer
-            # only keeps the combined timeline responsive between its signals.
+            if self._video_switching:
+                return
             located = self._locate(self.position_ms)
-            if located:
-                index, _clip, _source_index, start, _local = located
-                if index == self._active_timeline_index:
-                    self.position_ms = start + int(self.player.position())
-                    self._set_slider_value(self.position_ms)
-                    self._update_counter()
+            if located and located[0] == self._active_timeline_index:
+                start = located[3]
+                self.position_ms = min(self.slider.maximum(), start + int(self.player.position()))
+                self._set_slider_value(self.position_ms)
+                self._update_counter()
             return
         target = self.play_base_ms + self.clock.elapsed()
         if target >= self.slider.maximum():
@@ -354,46 +369,96 @@ class PreviewWidget(QWidget):
         located = self._locate(self.position_ms)
         return located[1].media_type if located else ""
 
-    def _load_video(self, timeline_index: int, clip: MediaClip, local_ms: int) -> None:
+    def _activate_video(self, timeline_index: int, clip: MediaClip, local_ms: int) -> None:
         if not self.player:
             return
         source = QUrl.fromLocalFile(str(Path(clip.path).resolve()))
-        if self.player.source() != source:
-            self._pending_video_seek = int(local_ms)
-            self._play_after_load = self.playing
-            self.player.setSource(source)
-        else:
-            if abs(int(self.player.position()) - int(local_ms)) > 35:
-                self.player.setPosition(int(local_ms))
-            if self.playing:
-                self.player.play()
         self._active_timeline_index = timeline_index
+        self._end_handled_index = -1
+        if self.player.source() != source:
+            self.player.pause()
+            self._expected_video_source = source
+            self._video_switching = True
+            self._pending_video_seek = max(0, int(local_ms))
+            self._pending_video_play = self.playing
+            self._last_video_position = 0
+            self.player.setSource(source)
+            return
+        self._expected_video_source = source
+        self._video_switching = False
+        self._pending_video_seek = None
+        self._last_video_position = max(0, int(local_ms))
+        if abs(int(self.player.position()) - int(local_ms)) > 35:
+            self.player.setPosition(max(0, int(local_ms)))
+        if self.playing:
+            self.player.play()
+
+    def _resume_expected_video(self) -> None:
+        if (
+            self.player
+            and self.playing
+            and not self._video_switching
+            and self.player.source() == self._expected_video_source
+        ):
+            self.player.play()
 
     def _video_status_changed(self, status) -> None:
         if not self.player or not QT_MULTIMEDIA_AVAILABLE:
             return
+        if self.player.source() != self._expected_video_source:
+            return
         if status in (QMediaPlayer.MediaStatus.LoadedMedia, QMediaPlayer.MediaStatus.BufferedMedia):
-            self.player.setPosition(max(0, int(self._pending_video_seek)))
-            if self._play_after_load:
-                self.player.play()
+            if not self._video_switching:
+                return
+            seek = max(0, int(self._pending_video_seek or 0))
+            should_play = bool(self._pending_video_play and self.playing)
+            self._video_switching = False
+            self._pending_video_seek = None
+            self._pending_video_play = False
+            self._last_video_position = seek
+            self.player.setPosition(seek)
+            if should_play:
+                QTimer.singleShot(0, self._resume_expected_video)
         elif status == QMediaPlayer.MediaStatus.EndOfMedia:
-            self._advance_video_segment()
+            if self._video_switching or not self.playing:
+                return
+            if self._end_handled_index == self._active_timeline_index:
+                return
+            self._end_handled_index = self._active_timeline_index
+            QTimer.singleShot(0, self._advance_video_segment)
 
     def _advance_video_segment(self) -> None:
+        if not self.playing:
+            return
         next_index = self._active_timeline_index + 1
         if next_index >= len(self.timeline):
-            self.seek_ms(self.slider.maximum())
+            self.position_ms = self.slider.maximum()
+            self._set_slider_value(self.position_ms)
+            self._update_counter()
             self.stop()
             return
-        _clip, _source_index, start, _end = self.timeline[next_index]
-        self.seek_ms(start)
-        if self.playing and self.player:
-            self._play_after_load = True
-            self.player.play()
+        clip, _source_index, start, _end = self.timeline[next_index]
+        self.position_ms = start
+        self._set_slider_value(start)
+        self._update_counter()
+        if clip.media_type == "video" and self.player:
+            self._activate_video(next_index, clip, 0)
+        else:
+            self._active_timeline_index = next_index
+            self.play_base_ms = start
+            self.clock.restart()
+            self.display_stack.setCurrentWidget(self.canvas)
 
     def _video_position_changed(self, local_ms: int) -> None:
+        if self._video_switching or not self.player:
+            return
+        if self.player.source() != self._expected_video_source:
+            return
         if self._active_timeline_index < 0 or self._active_timeline_index >= len(self.timeline):
             return
+        if self.playing and int(local_ms) + 250 < self._last_video_position:
+            return
+        self._last_video_position = max(0, int(local_ms))
         _clip, _source_index, start, _end = self.timeline[self._active_timeline_index]
         self.position_ms = min(self.slider.maximum(), start + int(local_ms))
         self._set_slider_value(self.position_ms)
@@ -405,6 +470,9 @@ class PreviewWidget(QWidget):
             self.message.emit(detail)
 
     def _render_sequence_frame(self, clip: MediaClip, frame: int) -> None:
+        frame_key = (clip.clip_id, frame)
+        if self._sequence_frame_key == frame_key:
+            return
         path = clip.sequence_file_for_frame(frame)
         width = max(1, self.canvas.width())
         height = max(1, self.canvas.height())
@@ -432,33 +500,17 @@ class PreviewWidget(QWidget):
                     Qt.TransformationMode.SmoothTransformation,
                 )
             )
-        self._sequence_frame_key = (clip.clip_id, frame)
+        self._sequence_frame_key = frame_key
 
     def _render_video_fallback(self, clip: MediaClip, frame: int) -> None:
         if not self.tools.ffmpeg:
             return
         seconds = frame / max(0.001, clip.fps)
-        base = [
-            self.tools.ffmpeg,
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-nostdin",
-        ]
+        base = [self.tools.ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin"]
         tail = [
-            "-ss",
-            f"{seconds:.9f}",
-            "-i",
-            str(Path(clip.path)),
-            "-frames:v",
-            "1",
-            "-vf",
-            "scale=960:540:force_original_aspect_ratio=decrease",
-            "-f",
-            "image2pipe",
-            "-vcodec",
-            "png",
-            "pipe:1",
+            "-ss", f"{seconds:.9f}", "-i", str(Path(clip.path)), "-frames:v", "1",
+            "-vf", "scale=960:540:force_original_aspect_ratio=decrease",
+            "-f", "image2pipe", "-vcodec", "png", "pipe:1",
         ]
         for command in (base + ["-hwaccel", "auto"] + tail, base + tail):
             try:
@@ -510,4 +562,5 @@ class PreviewWidget(QWidget):
         located = self._locate(self.position_ms)
         if located and located[1].media_type == "sequence":
             self._frame_cache.clear()
+            self._sequence_frame_key = None
             self.seek_ms(self.position_ms)
