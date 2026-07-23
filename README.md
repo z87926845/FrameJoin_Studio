@@ -125,3 +125,5 @@ python main.py
 ```
 
 Place `ffmpeg` and `ffprobe` in `tools/` or on the system `PATH`. See [BUILD.md](BUILD.md) and [TESTING.md](TESTING.md).
+
+<!-- build-trigger: 0.24-portable-validation -->
