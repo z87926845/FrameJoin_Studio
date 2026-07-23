@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  APP_VERSION: "0.21"
+  APP_VERSION: "0.24"
 
 jobs:
   windows:
@@ -76,7 +76,7 @@ jobs:
       - name: Build Windows application
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --windowed --name FrameJoinStudio --icon framejoin/assets/app.ico --add-data "framejoin/assets;framejoin/assets" main.py
+          pyinstaller --noconfirm --clean --windowed --name FrameJoinStudio --icon framejoin/assets/app.ico --hidden-import PySide6.QtMultimedia --hidden-import PySide6.QtMultimediaWidgets --add-data "framejoin/assets;framejoin/assets" main.py
           if (-not (Test-Path dist\FrameJoinStudio\FrameJoinStudio.exe)) { throw "PyInstaller output is missing" }
 
       - name: Assemble Windows portable ZIP
@@ -184,7 +184,7 @@ jobs:
       - name: Build macOS application
         run: |
           set -euo pipefail
-          pyinstaller --noconfirm --clean --windowed --name FrameJoinStudio --osx-bundle-identifier com.framejoinstudio.app --icon framejoin/assets/app.icns --add-data "framejoin/assets:framejoin/assets" main.py
+          pyinstaller --noconfirm --clean --windowed --name FrameJoinStudio --osx-bundle-identifier com.framejoinstudio.app --icon framejoin/assets/app.icns --hidden-import PySide6.QtMultimedia --hidden-import PySide6.QtMultimediaWidgets --add-data "framejoin/assets:framejoin/assets" main.py
           test -d dist/FrameJoinStudio.app
 
       - name: Bundle FFmpeg
