@@ -1,3 +1,4 @@
+<img width="1672" height="941" alt="image" src="https://github.com/user-attachments/assets/a34e9bee-35db-453e-957b-fc9273e5d679" />
 # FrameJoin Studio 0.21
 
 [中文](#中文) · [English](#english)
