@@ -27,6 +27,8 @@ class UiSmokeTests(unittest.TestCase):
     def test_bilingual_strings(self) -> None:
         self.assertIn("序列", tr("zh_CN", "add_sequence"))
         self.assertIn("Sequence", tr("en_US", "add_sequence"))
+        self.assertIn("实际帧率", tr("zh_CN", "preview_sequence_clock"))
+        self.assertIn("hardware", tr("en_US", "preview_video_hw").lower())
 
     def test_main_window_constructs_when_tools_exist(self) -> None:
         from framejoin.tools import Toolchain
@@ -37,6 +39,9 @@ class UiSmokeTests(unittest.TestCase):
         window = MainWindow()
         self.assertEqual(window.language_combo.count(), 2)
         self.assertGreaterEqual(window.settings_panel.codec_combo.count(), 3)
+        self.assertEqual(window.preview.mode_combo.count(), 2)
+        self.assertFalse(window.settings_panel.lossy_options.isHidden())
+        self.assertFalse(window.settings_panel.lossy_options.isEnabled())
         window.close()
 
 
