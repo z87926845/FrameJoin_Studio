@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  APP_VERSION: "0.24"
+  APP_VERSION: "0.25"
 
 jobs:
   windows:
@@ -96,13 +96,11 @@ jobs:
           choco install innosetup --no-progress -y --limit-output
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found" }
-
           $languageUrl = "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/ChineseSimplified.isl"
           $languageFile = Join-Path $env:GITHUB_WORKSPACE "installer\windows\ChineseSimplified.isl"
           Invoke-WebRequest $languageUrl -OutFile $languageFile
           if (-not (Test-Path $languageFile)) { throw "Simplified Chinese language file was not downloaded" }
           if ((Get-Item $languageFile).Length -lt 10000) { throw "Simplified Chinese language file is unexpectedly small" }
-
           $env:APP_SOURCE_DIR = (Resolve-Path dist\FrameJoinStudio).Path
           $env:APP_OUTPUT_DIR = (Resolve-Path dist).Path
           $env:APP_ICON_FILE = (Resolve-Path framejoin\assets\app.ico).Path
