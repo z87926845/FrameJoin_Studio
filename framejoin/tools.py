@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -129,40 +128,62 @@ class EncoderCapabilities:
             match = re.match(r"^\s*[A-Z.]{6}\s+(\S+)", line)
             if match:
                 encoders.add(match.group(1))
-        hardware_names = {
-            encoder
-            for mapping in _HARDWARE_ENCODERS.values()
-            for encoder in mapping.values()
-            if encoder in encoders
-        }
+        hardware_names = sorted(
+            {
+                encoder
+                for mapping in _HARDWARE_ENCODERS.values()
+                for encoder in mapping.values()
+                if encoder in encoders
+            }
+        )
 
-        def probe_hardware_encoder(encoder_name: str) -> tuple[str, bool]:
+        # Hardware drivers frequently serialize device initialization. Probing
+        # several APIs in parallel can make valid NVENC/QSV/AMF devices fail
+        # intermittently, so 0.25 deliberately verifies them one at a time.
+        usable: set[str] = set()
+        failed: list[str] = []
+        for encoder_name in hardware_names:
             try:
                 result = subprocess.run(
                     [
-                        ffmpeg_path, "-hide_banner", "-loglevel", "error", "-nostdin",
-                        "-f", "lavfi", "-i", "color=c=black:s=64x64:r=1:d=0.1",
-                        "-frames:v", "1", "-c:v", encoder_name, "-f", "null", "-",
+                        ffmpeg_path,
+                        "-hide_banner",
+                        "-loglevel",
+                        "error",
+                        "-nostdin",
+                        "-f",
+                        "lavfi",
+                        "-i",
+                        "color=c=black:s=64x64:r=1:d=0.1",
+                        "-frames:v",
+                        "1",
+                        "-c:v",
+                        encoder_name,
+                        "-f",
+                        "null",
+                        "-",
                     ],
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    timeout=8,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=10,
                     check=False,
                     **hidden_subprocess_kwargs(),
                 )
-                return encoder_name, result.returncode == 0
+                if result.returncode == 0:
+                    usable.add(encoder_name)
+                else:
+                    failed.append(encoder_name)
             except (OSError, subprocess.SubprocessError):
-                return encoder_name, False
-
-        usable: set[str] = set()
-        if hardware_names:
-            with ThreadPoolExecutor(max_workers=min(4, len(hardware_names))) as pool:
-                futures = [pool.submit(probe_hardware_encoder, name) for name in sorted(hardware_names)]
-                for future in as_completed(futures):
-                    name, ok = future.result()
-                    if ok:
-                        usable.add(name)
-        error = "" if encoders else "FFmpeg 未返回编码器列表"
+                failed.append(encoder_name)
+        if not encoders:
+            error = "FFmpeg 未返回编码器列表"
+        elif failed and not usable:
+            error = "检测到硬件编码器名称，但实际试编码失败：" + ", ".join(failed)
+        else:
+            error = ""
         return cls(encoders, usable, error)
 
     def supports(self, encoder_name: str) -> bool:
@@ -178,7 +199,12 @@ class EncoderCapabilities:
         return self.encoder_for(backend, codec) is not None
 
     def available_hardware_backends(self, codec: str) -> list[str]:
-        return [name for name in (("videotoolbox", "nvenc", "qsv", "amf") if sys.platform == "darwin" else ("nvenc", "qsv", "amf", "videotoolbox")) if self.encoder_for(name, codec)]
+        order = (
+            ("videotoolbox", "nvenc", "qsv", "amf")
+            if sys.platform == "darwin"
+            else ("nvenc", "qsv", "amf", "videotoolbox")
+        )
+        return [name for name in order if self.encoder_for(name, codec)]
 
     @staticmethod
     def backend_label(backend: str) -> str:
