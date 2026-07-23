@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
+from pathlib import Path
+from uuid import uuid4
+
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import QListWidget
+
 from .exporter import ExportPlan
 from .probe import is_image_path, is_video_path
 from .tools import hidden_subprocess_kwargs
@@ -46,6 +52,7 @@ class ExportThread(QThread):
         self.output_path = output_path
         self._process: subprocess.Popen | None = None
         self._cancelled = False
+        self._staging_directory: Path | None = None
 
     def cancel(self) -> None:
         self._cancelled = True
@@ -57,6 +64,8 @@ class ExportThread(QThread):
 
     def run(self) -> None:
         try:
+            if self.plan.file_copies:
+                self._run_file_copies()
             for command in self.plan.commands:
                 if self._cancelled:
                     raise RuntimeError("cancelled")
@@ -68,15 +77,53 @@ class ExportThread(QThread):
             self.failed.emit("cancelled" if self._cancelled else str(exc))
         finally:
             self._process = None
+            if self._staging_directory and self._staging_directory.exists():
+                shutil.rmtree(self._staging_directory, ignore_errors=True)
+            self._staging_directory = None
             for path in self.plan.temporary_files:
                 try:
                     path.unlink(missing_ok=True)
                 except OSError:
                     pass
 
+    def _run_file_copies(self) -> None:
+        target = self.plan.output_directory
+        if target is None:
+            raise RuntimeError("连续序列帧输出缺少目标目录。")
+        target = target.resolve()
+        if target.exists() and (not target.is_dir() or any(target.iterdir())):
+            raise RuntimeError("连续序列帧输出目录必须不存在或为空目录。")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        staging = target.parent / f".{target.name}.framejoin-{uuid4().hex}"
+        staging.mkdir(parents=False, exist_ok=False)
+        self._staging_directory = staging
+
+        total = max(1, len(self.plan.file_copies))
+        for index, (source, filename) in enumerate(self.plan.file_copies, start=1):
+            if self._cancelled:
+                raise RuntimeError("cancelled")
+            destination = staging / filename
+            self.message.emit(f"{source.name} → {filename}")
+            shutil.copy2(source, destination)
+            self.progress.emit(index / total)
+
+        if target.exists():
+            target.rmdir()
+        os.replace(staging, target)
+        self._staging_directory = None
+
     def _run_command(self, command: list[str]) -> None:
         self.message.emit(" ".join(command[:8]) + " …")
-        self._process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1, **hidden_subprocess_kwargs())
+        self._process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+            **hidden_subprocess_kwargs(),
+        )
         assert self._process.stdout is not None
         duration = max(0.001, self.plan.total_duration)
         for line in self._process.stdout:
@@ -84,7 +131,9 @@ class ExportThread(QThread):
                 break
             if line.startswith("out_time_ms="):
                 try:
-                    self.progress.emit(max(0.0, min(1.0, int(line.split("=", 1)[1]) / 1_000_000 / duration)))
+                    self.progress.emit(
+                        max(0.0, min(1.0, int(line.split("=", 1)[1]) / 1_000_000 / duration))
+                    )
                 except ValueError:
                     pass
         stderr = self._process.stderr.read() if self._process.stderr else ""
