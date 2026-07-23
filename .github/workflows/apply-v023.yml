@@ -1,5 +1,7 @@
 name: Apply FrameJoin Studio 0.23
 
+# This follow-up commit intentionally triggers the workflow after the workflow
+# file already exists on the default branch.
 on:
   push:
     branches: [main]
