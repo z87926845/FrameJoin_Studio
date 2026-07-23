@@ -22,9 +22,13 @@ from framejoin.brand_data import asset_bytes
 
 app = QGuiApplication.instance() or QGuiApplication(["framejoin-build-icon"])
 assets = root / "framejoin" / "assets"
-renderer = QSvgRenderer(QByteArray(asset_bytes("logo.svg")))
+
+# The stable public branding key is logo.png. During the transitional source
+# layout asset_bytes() returns the verified embedded vector bytes behind that
+# key, which QSvgRenderer can render without relying on the file extension.
+renderer = QSvgRenderer(QByteArray(asset_bytes("logo.png")))
 if not renderer.isValid():
-    raise SystemExit("Invalid fixed logo.svg")
+    raise SystemExit("Invalid fixed logo branding resource")
 
 image = QImage(1024, 1024, QImage.Format.Format_ARGB32)
 image.fill(0)
