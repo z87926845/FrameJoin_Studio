@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog, QInputDialog, QListWidgetItem, QMessageBox
+
 from .exporter import build_join_plan, choose_join_extension, stream_copy_report
 from .i18n import tr
 from .models import JoinSettings, MediaClip
@@ -35,7 +37,7 @@ class MainActionsMixin:
             incoming = "sequence" if image_paths else "video"
             if existing and incoming not in existing:
                 QMessageBox.warning(self, tr(self.language, "open_failed"), tr(self.language, "mixed")); return
-        fps = self.settings_panel.fps_edit.text().strip() or "24"
+        fps = self.settings_panel.fps_value()
         if image_paths:
             fps, ok = QInputDialog.getText(self, tr(self.language, "sequence_fps_title"), tr(self.language, "sequence_fps_prompt"), text=fps)
             if not ok:
@@ -51,18 +53,14 @@ class MainActionsMixin:
                     continue
                 seen_patterns.add(clip.sequence_pattern)
                 self._append_clip(clip)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 QMessageBox.critical(self, tr(self.language, "open_failed"), f"{Path(path).name}\n\n{exc}")
         self.status_label.setText(tr(self.language, "status_ready"))
         self.refresh_mode()
 
     def _append_clip(self, clip: MediaClip) -> None:
-        item = QListWidgetItem()
-        item.setData(Qt.ItemDataRole.UserRole, clip)
-        self.media_list.addItem(item)
-        self._update_item(item)
-        if self.media_list.count() == 1:
-            self.media_list.setCurrentItem(item)
+        item = QListWidgetItem(); item.setData(Qt.ItemDataRole.UserRole, clip); self.media_list.addItem(item); self._update_item(item)
+        if self.media_list.count() == 1: self.media_list.setCurrentItem(item)
 
     def _update_item(self, item: QListWidgetItem) -> None:
         clip: MediaClip = item.data(Qt.ItemDataRole.UserRole)
@@ -71,8 +69,7 @@ class MainActionsMixin:
         item.setToolTip(clip.path if clip.media_type == "video" else clip.sequence_pattern)
 
     def remove_selected(self) -> None:
-        for item in self.media_list.selectedItems():
-            self.media_list.takeItem(self.media_list.row(item))
+        for item in self.media_list.selectedItems(): self.media_list.takeItem(self.media_list.row(item))
         self.refresh_mode()
 
     def move_selected(self, delta: int) -> None:
@@ -84,7 +81,7 @@ class MainActionsMixin:
         try:
             for clip in self.ordered_clips():
                 if clip.media_type == "sequence": clip.set_fps_value(value)
-            self.settings_panel.fps_edit.setText(value)
+            self.settings_panel.set_fps_value(value)
             for index in range(self.media_list.count()): self._update_item(self.media_list.item(index))
             self.refresh_mode()
         except ValueError:
@@ -106,17 +103,13 @@ class MainActionsMixin:
         if not report.compatible: QMessageBox.critical(self, tr(self.language, "compatibility"), "\n".join(report.differences[:20])); return
         settings = self.settings_panel.settings(clips[0].media_type == "video")
         if force_cpu: settings.sequence_encoder_backend = "cpu"
-        try:
-            plan = build_join_plan(clips, settings, output, self.tools.ffmpeg, self.capabilities.usable_hardware_encoders)
-        except Exception as exc:
-            QMessageBox.critical(self, tr(self.language, "failed"), str(exc)); return
+        try: plan = build_join_plan(clips, settings, output, self.tools.ffmpeg, self.capabilities.usable_hardware_encoders)
+        except Exception as exc: QMessageBox.critical(self, tr(self.language, "failed"), str(exc)); return
         if plan.estimated_bytes: self.settings_panel.estimate_label.setText(tr(self.language, "estimated", size=format_bytes(plan.estimated_bytes)))
         self._active_settings = settings; self._cpu_fallback_attempted = force_cpu
         self.export_thread = ExportThread(plan, output, self)
         self.export_thread.progress.connect(lambda p: self.progress.setValue(round(p * 1000)))
-        self.export_thread.message.connect(self.status_label.setText)
-        self.export_thread.succeeded.connect(self._export_succeeded)
-        self.export_thread.failed.connect(self._export_failed)
+        self.export_thread.message.connect(self.status_label.setText); self.export_thread.succeeded.connect(self._export_succeeded); self.export_thread.failed.connect(self._export_failed)
         self.settings_panel.set_running(True); self.progress.setValue(0); self.status_label.setText(tr(self.language, "exporting")); self.export_thread.start()
 
     def cancel_export(self) -> None:
@@ -126,8 +119,7 @@ class MainActionsMixin:
         self.settings_panel.set_running(False); self.progress.setValue(1000); self.status_label.setText(tr(self.language, "done")); QMessageBox.information(self, tr(self.language, "done"), path)
 
     def _export_failed(self, detail: str) -> None:
-        self.settings_panel.set_running(False)
-        settings = getattr(self, "_active_settings", JoinSettings())
+        self.settings_panel.set_running(False); settings = getattr(self, "_active_settings", JoinSettings())
         if detail != "cancelled" and settings.sequence_bitrate_enabled and settings.sequence_encoder_backend != "cpu" and not self._cpu_fallback_attempted:
             self.status_label.setText("Hardware encoder failed; retrying with CPU…"); self.start_export(force_cpu=True); return
         self.status_label.setText(tr(self.language, "cancelled" if detail == "cancelled" else "failed"))
@@ -137,9 +129,8 @@ class MainActionsMixin:
         path, _ = QFileDialog.getSaveFileName(self, tr(self.language, "save_project"), "", tr(self.language, "project_filter"))
         if not path: return
         if not path.lower().endswith(".fjproj"): path += ".fjproj"
-        data = {"version":1,"clips":[clip.to_dict() for clip in self.ordered_clips()],"settings":self.settings_panel.settings(False).to_dict(),"output":self.settings_panel.output_edit.text(),"fps":self.settings_panel.fps_edit.text()}
-        try:
-            Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"); self.status_label.setText(tr(self.language, "project_saved"))
+        data = {"version": 1, "clips": [clip.to_dict() for clip in self.ordered_clips()], "settings": self.settings_panel.settings(False).to_dict(), "output": self.settings_panel.output_edit.text(), "fps": self.settings_panel.fps_value()}
+        try: Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"); self.status_label.setText(tr(self.language, "project_saved"))
         except OSError as exc: QMessageBox.critical(self, tr(self.language, "project_error"), str(exc))
 
     def load_project(self) -> None:
@@ -149,6 +140,6 @@ class MainActionsMixin:
             data = json.loads(Path(path).read_text(encoding="utf-8")); self.media_list.clear()
             for raw in data.get("clips", []): self._append_clip(MediaClip.from_dict(raw))
             self.settings_panel.load_settings(JoinSettings.from_dict(data.get("settings", {})))
-            self.settings_panel.output_edit.setText(data.get("output", "")); self.settings_panel.fps_edit.setText(data.get("fps", "24"))
+            self.settings_panel.output_edit.setText(data.get("output", "")); self.settings_panel.set_fps_value(data.get("fps", "24"))
             self.status_label.setText(tr(self.language, "project_loaded")); self.refresh_mode()
         except Exception as exc: QMessageBox.critical(self, tr(self.language, "project_error"), str(exc))
