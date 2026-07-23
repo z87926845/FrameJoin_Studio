@@ -14,7 +14,7 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
     env:
-      APP_VERSION: "0.24"
+      APP_VERSION: "0.25"
     steps:
       - name: Download artifacts from successful installer build
         uses: actions/download-artifact@v4
@@ -30,7 +30,6 @@ jobs:
           set -euo pipefail
           rm -rf release
           mkdir -p release
-
           while IFS= read -r -d '' source_file; do
             file_name="$(basename "$source_file")"
             destination="release/$file_name"
@@ -40,9 +39,6 @@ jobs:
             fi
             cp "$source_file" "$destination"
           done < <(find downloaded-artifacts -type f -print0)
-
-          echo "Flattened release assets:"
-          ls -lah release
 
           expected=(
             "FrameJoin_Studio_v${APP_VERSION}_Windows_x64_Portable.zip"
@@ -58,7 +54,6 @@ jobs:
             "FrameJoin_Studio_v${APP_VERSION}_macOS_Intel.pkg"
             "FrameJoin_Studio_v${APP_VERSION}_macOS_Intel.pkg.sha256.txt"
           )
-
           for file in "${expected[@]}"; do
             test -f "release/$file" || {
               echo "Missing release asset: $file" >&2
@@ -66,14 +61,13 @@ jobs:
               exit 1
             }
           done
-
           actual_count="$(find release -maxdepth 1 -type f | wc -l | tr -d ' ')"
-          if [[ "$actual_count" != "12" ]]; then
+          [[ "$actual_count" == "12" ]] || {
             echo "Expected 12 release assets, found $actual_count" >&2
             exit 1
-          fi
+          }
 
-      - name: Create or update v0.24 release
+      - name: Create or update v0.25 release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -83,7 +77,6 @@ jobs:
           set -euo pipefail
           tag="v${APP_VERSION}"
           title="FrameJoin Studio ${APP_VERSION}"
-
           if gh release view "$tag" --repo "$GH_REPO" >/dev/null 2>&1; then
             gh release upload "$tag" release/* --clobber --repo "$GH_REPO"
             gh release edit "$tag" --title "$title" --target "$TARGET_SHA" --repo "$GH_REPO"
