@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import sys
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -43,6 +46,7 @@ class SettingsPanel(QGroupBox):
         super().__init__(parent)
         self.capabilities = capabilities
         self.language = language
+        self.video_mode = False
 
         self.fps_combo = QComboBox()
         self.fps_combo.setEditable(True)
@@ -59,7 +63,12 @@ class SettingsPanel(QGroupBox):
         fps_layout.addWidget(self.apply_fps_button)
 
         self.container_combo = QComboBox()
-        for text, data in (("MP4", "mp4"), ("MOV", "mov"), ("MKV", "mkv"), ("Auto / 跟随源", "auto")):
+        for text, data in (
+            ("MP4", "mp4"),
+            ("MOV", "mov"),
+            ("MKV", "mkv"),
+            ("Auto / 跟随源", "auto"),
+        ):
             self.container_combo.addItem(text, data)
 
         self.codec_combo = QComboBox()
@@ -67,11 +76,22 @@ class SettingsPanel(QGroupBox):
         self.codec_combo.addItem("", "h265_lossless")
         self.codec_combo.addItem("", "ffv1")
 
+        self.lossy_card = QFrame()
+        self.lossy_card.setObjectName("lossyCard")
+        lossy_card_layout = QVBoxLayout(self.lossy_card)
+        lossy_card_layout.setContentsMargins(12, 9, 12, 10)
+        lossy_card_layout.setSpacing(5)
+
         self.bitrate_check = QCheckBox()
+        self.bitrate_check.setObjectName("lossyEnableCheck")
         self.bitrate_check.setChecked(False)
+        lossy_card_layout.addWidget(self.bitrate_check)
+
         self.lossy_options = QWidget()
         self.lossy_form = QFormLayout(self.lossy_options)
-        self.lossy_form.setContentsMargins(12, 4, 0, 6)
+        self.lossy_form.setContentsMargins(22, 2, 0, 0)
+        self.lossy_form.setHorizontalSpacing(12)
+        self.lossy_form.setVerticalSpacing(7)
         self.bitrate_label = QLabel()
         self.bitrate_spin = QSpinBox()
         self.bitrate_spin.setRange(1, 1000)
@@ -79,8 +99,14 @@ class SettingsPanel(QGroupBox):
         self.bitrate_spin.setSuffix(" Mbps")
         self.backend_label = QLabel()
         self.backend_combo = QComboBox()
+        self.backend_combo.setMinimumContentsLength(24)
+        self.gpu_status_label = QLabel()
+        self.gpu_status_label.setWordWrap(True)
+        self.gpu_status_label.setObjectName("gpuStatusLabel")
         self.lossy_form.addRow(self.bitrate_label, self.bitrate_spin)
         self.lossy_form.addRow(self.backend_label, self.backend_combo)
+        self.lossy_form.addRow("", self.gpu_status_label)
+        lossy_card_layout.addWidget(self.lossy_options)
 
         self.output_edit = QLineEdit()
         self.browse_button = QPushButton()
@@ -98,6 +124,7 @@ class SettingsPanel(QGroupBox):
         self.mode_note.setWordWrap(True)
         self.estimate_label = QLabel()
         self.start_button = QPushButton()
+        self.start_button.setObjectName("primaryExportButton")
         self.cancel_button = QPushButton()
         self.cancel_button.setEnabled(False)
 
@@ -106,19 +133,52 @@ class SettingsPanel(QGroupBox):
         buttons.addWidget(self.cancel_button)
 
         self.form = QFormLayout()
+        self.form.setLabelAlignment(QtAlignmentRight())
+        self.form.setHorizontalSpacing(13)
+        self.form.setVerticalSpacing(9)
         self.form.addRow(self.fps_label, fps_row)
         self.form.addRow(self.container_label, self.container_combo)
         self.form.addRow(self.codec_label, self.codec_combo)
-        self.form.addRow("", self.bitrate_check)
-        self.form.addRow("", self.lossy_options)
+        self.form.addRow("", self.lossy_card)
         self.form.addRow(self.output_label, output_row)
 
         body = QVBoxLayout(self)
+        body.setContentsMargins(13, 15, 13, 13)
         body.addLayout(self.form)
         body.addWidget(self.mode_note)
         body.addWidget(self.estimate_label)
         body.addStretch(1)
         body.addLayout(buttons)
+
+        self.setStyleSheet(
+            """
+            QFrame#lossyCard {
+                background:#091b2d;
+                border:1px solid #234d70;
+                border-radius:9px;
+            }
+            QFrame#lossyCard:disabled {
+                background:#081522;
+                border-color:#17344c;
+            }
+            QCheckBox#lossyEnableCheck {
+                color:#8ee7ff;
+                font-size:15px;
+                font-weight:700;
+                padding:7px 5px;
+            }
+            QCheckBox#lossyEnableCheck:disabled { color:#667f91; }
+            QLabel#gpuStatusLabel { color:#6f9bb8; font-size:12px; padding-top:2px; }
+            QPushButton#primaryExportButton {
+                min-height:31px;
+                background:#087aa7;
+                border-color:#19cfff;
+                font-size:15px;
+                font-weight:700;
+            }
+            QPushButton#primaryExportButton:hover { background:#0795c9; }
+            """
+        )
 
         self.apply_fps_button.clicked.connect(self._emit_fps)
         self.browse_button.clicked.connect(self.browse_requested)
@@ -160,6 +220,7 @@ class SettingsPanel(QGroupBox):
         self.apply_fps_button.setText(tr(language, "apply_fps"))
         self.fps_combo.setToolTip(tr(language, "fps_hint"))
         self.bitrate_check.setText(tr(language, "bitrate_enable"))
+        self.bitrate_check.setToolTip(tr(language, "bitrate_enable_hint"))
         self.browse_button.setText(tr(language, "browse"))
         self.start_button.setText(tr(language, "start"))
         self.cancel_button.setText(tr(language, "cancel"))
@@ -175,11 +236,45 @@ class SettingsPanel(QGroupBox):
         self.backend_combo.clear()
         self.backend_combo.addItem(tr(self.language, "auto"), "auto")
         self.backend_combo.addItem(tr(self.language, "cpu"), "cpu")
-        for backend in self.capabilities.available_hardware_backends(codec):
-            self.backend_combo.addItem(tr(self.language, backend), backend)
+
+        backends = (
+            ("videotoolbox",)
+            if sys.platform == "darwin"
+            else ("nvenc", "qsv", "amf")
+        )
+        available_count = 0
+        for backend in backends:
+            available = self.capabilities.backend_available(backend, codec)
+            label = tr(self.language, backend)
+            if not available:
+                label = f"{label} · {tr(self.language, 'gpu_unavailable')}"
+            self.backend_combo.addItem(label, backend)
+            item = self.backend_combo.model().item(self.backend_combo.count() - 1)
+            if item is not None:
+                item.setEnabled(available)
+                item.setToolTip(
+                    tr(self.language, "gpu_available_hint")
+                    if available
+                    else tr(self.language, "gpu_unavailable_hint")
+                )
+            if available:
+                available_count += 1
+
         found = self.backend_combo.findData(selected)
-        self.backend_combo.setCurrentIndex(found if found >= 0 else 0)
+        if found >= 0 and self.backend_combo.model().item(found).isEnabled():
+            self.backend_combo.setCurrentIndex(found)
+        else:
+            self.backend_combo.setCurrentIndex(0)
         self.backend_combo.blockSignals(False)
+        self.gpu_status_label.setText(
+            tr(self.language, "gpu_detected", count=available_count)
+            if available_count
+            else tr(self.language, "gpu_none_detected")
+        )
+        self._mode_changed()
+
+    def set_video_mode(self, video_mode: bool) -> None:
+        self.video_mode = bool(video_mode)
         self._mode_changed()
 
     def _mode_changed(self, *_args) -> None:
@@ -189,14 +284,22 @@ class SettingsPanel(QGroupBox):
             self.bitrate_check.setChecked(False)
             self.bitrate_check.blockSignals(False)
 
-        lossy = self.bitrate_check.isChecked() and not ffv1
-        self.bitrate_check.setEnabled(not ffv1)
-        self.lossy_options.setVisible(lossy)
+        lossy = self.bitrate_check.isChecked() and not ffv1 and not self.video_mode
+        self.bitrate_check.setEnabled(not ffv1 and not self.video_mode)
+        self.lossy_options.setVisible(True)
+        self.lossy_options.setEnabled(lossy)
         self.bitrate_spin.setEnabled(lossy)
         self.backend_combo.setEnabled(lossy)
-        self.mode_note.setText(tr(self.language, "sequence_bitrate" if lossy else "sequence_lossless"))
+        self.gpu_status_label.setEnabled(lossy)
+        self.mode_note.setText(
+            tr(self.language, "video_mode")
+            if self.video_mode
+            else tr(self.language, "sequence_bitrate" if lossy else "sequence_lossless")
+        )
         self.mode_note.setStyleSheet(
-            "color:#ffcb6b;padding:4px;" if lossy else "color:#8fb9d8;padding:4px;"
+            "color:#ffcb6b;padding:6px 3px;"
+            if lossy
+            else "color:#85abc5;padding:6px 3px;"
         )
 
     def settings(self, video_mode: bool) -> JoinSettings:
@@ -210,7 +313,10 @@ class SettingsPanel(QGroupBox):
         )
 
     def load_settings(self, settings: JoinSettings) -> None:
-        for combo, data in ((self.container_combo, settings.container), (self.codec_combo, settings.sequence_codec)):
+        for combo, data in (
+            (self.container_combo, settings.container),
+            (self.codec_combo, settings.sequence_codec),
+        ):
             index = combo.findData(data)
             if index >= 0:
                 combo.setCurrentIndex(index)
@@ -222,3 +328,10 @@ class SettingsPanel(QGroupBox):
     def set_running(self, running: bool) -> None:
         self.start_button.setEnabled(not running)
         self.cancel_button.setEnabled(running)
+
+
+def QtAlignmentRight():
+    # Kept as a tiny helper so this module does not need another broad Qt import.
+    from PySide6.QtCore import Qt
+
+    return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
