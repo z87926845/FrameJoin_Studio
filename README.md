@@ -20,6 +20,7 @@ FrameJoin Studio 是一款 Windows/macOS 视频拼接与序列帧处理工具，
 - 视频转码音频支持 AAC 320 kbps、原音频复制（仅参数一致）或无音频。
 - 序列帧新增“输出为连续序列帧”：不修改源文件、不重新编码图像，按素材列表顺序复制到新目录并连续编号。
 - 连续序列帧可设置文件名前缀、起始编号和编号位数。
+- 连续序列帧默认从 0 开始，使用 6 位编号。
 - 连续序列帧先写入同级临时目录，全部成功后再整体切换为最终目录，取消或失败不会留下半套正式编号文件。
 
 ### 输出模式
@@ -45,7 +46,7 @@ FrameJoin Studio 是一款 Windows/macOS 视频拼接与序列帧处理工具，
    - 原图文件字节保持不变。
    - 不在原目录改名，不覆盖源文件。
    - 第一段结束后，第二段从下一个编号继续。
-   - 默认示例：`frame_000001.png`、`frame_000002.png`……
+   - 默认从 0 开始、使用 6 位编号：`frame_000000.png`、`frame_000001.png`……
    - 各段需使用相同图像扩展名、分辨率、像素格式/位深和透明通道状态。
 
 2. **真无损视频**
@@ -93,6 +94,7 @@ FrameJoin Studio is a Windows/macOS video joining and image-sequence processing 
 - Video audio can be AAC 320 kbps, copied unchanged when all streams match, or omitted.
 - Image sequences can now be exported as one continuously numbered sequence without modifying or re-encoding the source images.
 - Continuous sequence output supports filename prefix, start number, and numeric padding.
+- Continuous sequence numbering defaults to frame 0 with six digits.
 - Frames are copied into a sibling staging directory and atomically promoted only after every file succeeds.
 
 ### Output modes
@@ -118,7 +120,7 @@ FrameJoin Studio is a Windows/macOS video joining and image-sequence processing 
    - Preserves original image bytes.
    - Never renames or overwrites source files.
    - The next segment continues with the next frame number.
-   - Example: `frame_000001.png`, `frame_000002.png`, ...
+   - Defaults to zero-based six-digit numbering: `frame_000000.png`, `frame_000001.png`, ...
    - Segments must share image extension, resolution, pixel format/bit depth, and alpha state.
 
 2. **True-lossless video**
