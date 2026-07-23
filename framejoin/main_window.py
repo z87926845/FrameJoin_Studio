@@ -72,5 +72,6 @@ class MainWindow(MainActionsMixin, QMainWindow):
 
     def refresh_mode(self,*_args)->None:
         clips=self.ordered_clips(); video_mode=bool(clips and clips[0].media_type=="video")
-        for widget in (self.settings_panel.fps_edit,self.settings_panel.apply_fps_button,self.settings_panel.codec_combo,self.settings_panel.bitrate_check,self.settings_panel.bitrate_spin,self.settings_panel.backend_combo): widget.setEnabled(not video_mode)
+        for widget in (self.settings_panel.fps_combo,self.settings_panel.apply_fps_button,self.settings_panel.codec_combo,self.settings_panel.bitrate_check,self.settings_panel.bitrate_spin,self.settings_panel.backend_combo): widget.setEnabled(not video_mode)
+        self.settings_panel.lossy_options.setVisible(not video_mode and self.settings_panel.bitrate_check.isChecked() and self.settings_panel.codec_combo.currentData() != "ffv1")
         self.settings_panel.mode_note.setText(tr(self.language,"video_mode") if video_mode else tr(self.language,"sequence_bitrate" if self.settings_panel.bitrate_check.isChecked() else "sequence_lossless"))
