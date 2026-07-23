@@ -36,6 +36,11 @@ def run() -> int:
         splash.show()
         app.processEvents()
         window = MainWindow()
+        # Continuous sequence output defaults to frame_000000 with six digits.
+        # Apply this after constructing the panel so packaged builds and older
+        # projects that do not contain numbering fields use the same defaults.
+        window.settings_panel.frame_start_spin.setValue(0)
+        window.settings_panel.frame_digits_spin.setValue(6)
     except Exception as exc:  # noqa: BLE001
         QMessageBox.critical(None, "FrameJoin Studio", str(exc))
         return 1
