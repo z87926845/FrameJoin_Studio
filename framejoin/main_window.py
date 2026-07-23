@@ -346,18 +346,7 @@ class MainWindow(MainActionsMixin, QMainWindow):
             self.settings_panel.fps_combo,
             self.settings_panel.apply_fps_button,
             self.settings_panel.codec_combo,
-            self.settings_panel.bitrate_check,
         ):
             widget.setEnabled(not video_mode)
-        self.settings_panel._mode_changed()
-        self.settings_panel.mode_note.setText(
-            tr(self.language, "video_mode")
-            if video_mode
-            else tr(
-                self.language,
-                "sequence_bitrate"
-                if self.settings_panel.bitrate_check.isChecked()
-                else "sequence_lossless",
-            )
-        )
+        self.settings_panel.set_video_mode(video_mode)
         self._sync_preview(False)
